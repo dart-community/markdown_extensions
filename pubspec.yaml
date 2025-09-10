@@ -1,0 +1,11 @@
+name: markdown_extensions
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+workspace:
+  - pkgs/markdown_description_list
+
+dev_dependencies:
+  melos: ^7.1.0
