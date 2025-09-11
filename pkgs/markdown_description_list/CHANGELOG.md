@@ -1,3 +1,7 @@
+## 0.1.1-wip
+
+- Support a single empty line after terms and before the description.
+
 ## 0.1.0
 
 - Initial release of the package with support for description lists,

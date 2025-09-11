@@ -506,6 +506,119 @@ spanning multiple lines.</p>
       });
     });
 
+    group('empty lines between terms and descriptions', () {
+      test('allows a single empty line between term and description', () {
+        const markdown = '''
+Term
+
+: Description after an empty line.''';
+
+        expect(
+          renderMarkdown(markdown),
+          equals('''
+<dl>
+<dt>Term</dt>
+<dd>
+<p>Description after an empty line.</p>
+</dd>
+</dl>'''),
+        );
+      });
+
+      test('rejects multiple empty lines between term and description', () {
+        const markdown = '''
+Term
+
+
+: This should not be parsed as a description list.''';
+
+        final html = renderMarkdown(markdown);
+        expect(html, isNot(contains('<dl>')));
+        expect(html, contains('<p>Term</p>'));
+        expect(html, contains(': This should not be parsed'));
+      });
+
+      test('allows consecutive terms without empty lines', () {
+        const markdown = '''
+First term
+Second term
+Third term
+
+: Description for all three terms.''';
+
+        expect(
+          renderMarkdown(markdown),
+          equals('''
+<dl>
+<dt>First term</dt>
+<dt>Second term</dt>
+<dt>Third term</dt>
+<dd>
+<p>Description for all three terms.</p>
+</dd>
+</dl>'''),
+        );
+      });
+
+      test('handles mixed scenarios correctly', () {
+        const markdown = '''
+First term
+: First description without an empty line.
+
+Second term
+
+: Second description with a single empty line.
+
+Third term
+Fourth term
+
+: Shared description for consecutive terms.''';
+
+        expect(
+          renderMarkdown(markdown),
+          equals('''
+<dl>
+<dt>First term</dt>
+<dd>
+<p>First description without an empty line.</p>
+</dd>
+<dt>Second term</dt>
+<dd>
+<p>Second description with a single empty line.</p>
+</dd>
+<dt>Third term</dt>
+<dt>Fourth term</dt>
+<dd>
+<p>Shared description for consecutive terms.</p>
+</dd>
+</dl>'''),
+        );
+      });
+
+      test('allows empty lines with multiple descriptions', () {
+        const markdown = '''
+Term
+
+: First description after an empty line.
+
+: Second description after another empty line.''';
+
+        expect(
+          renderMarkdown(markdown),
+          equals('''
+<dl>
+<dt>Term</dt>
+<dd>
+<p>First description after an empty line.</p>
+</dd>
+<dd>
+<p>Second description after another empty line.</p>
+</dd>
+</dl>'''),
+        );
+      });
+    });
+
     group('edge cases', () {
       test('handles description without preceding term', () {
         const markdown = ': This is a description without a term.';
@@ -694,9 +807,9 @@ Valid term
       test('recognizes term pattern', () {
         final testCases = [
           ('Simple term', true),
-          ('  Indented term', false),
-          ('\tTabbed term', false),
+          ('  Indented term', true),
           (': Not a term', false),
+          ('# A header', false),
           ('', false),
           ('   ', false),
           ('Term with spaces', true),

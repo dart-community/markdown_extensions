@@ -87,7 +87,21 @@ final class DescriptionListSyntax extends md.BlockSyntax {
   static List<md.Element> _parseTerms(md.BlockParser parser) {
     final termElements = <md.Element>[];
 
-    while (!parser.isDone && isValidTerm(parser.current.content)) {
+    while (!parser.isDone) {
+      final currentContent = parser.current.content;
+
+      // Skip any empty lines while we look for the next term.
+      if (currentContent.trim().isEmpty) {
+        parser.advance();
+        continue;
+      }
+
+      // If this is a non-empty string that's not a valid term,
+      // stop looking for more terms.
+      if (!isValidTerm(currentContent)) {
+        break;
+      }
+
       final termLine = parser.current;
       parser.advance();
 
@@ -97,12 +111,12 @@ final class DescriptionListSyntax extends md.BlockSyntax {
         parser.document,
       ).parseLines();
 
-      // If the content is wrapped in a paragraph, unwrap it.
       final firstNode = termNodes.firstOrNull;
       if (firstNode == null) continue;
 
       termElements.add(
         md.Element('dt', [
+          // If the content is wrapped in a paragraph, unwrap it.
           if (firstNode is md.Element && firstNode.tag == 'p')
             ...?firstNode.children
           else
@@ -169,14 +183,19 @@ final class DescriptionListSyntax extends md.BlockSyntax {
   bool _isDescriptionListStart(md.BlockParser parser) {
     if (parser.isDone) return false;
 
-    // Check if current line is a term that's part of a sequence
-    // leading to descriptions.
+    // Check if current line starts a sequence of one or more terms that are
+    // eventually followed by at least on description.
     if (isValidTerm(parser.current.content)) {
       // Look ahead to find the first non-term line,
       // up to the limit of consecutive terms allowed.
+      var termsFound = 0;
+      var foundEmptyAfterTerm = false;
+
       for (
         var lookAheadOffset = 1;
-        lookAheadOffset <= maxTermsPerDescription;
+        // Look up to two additional lines to account for one new line
+        // as well as the first description itself.
+        lookAheadOffset <= maxTermsPerDescription + 2;
         lookAheadOffset += 1
       ) {
         final nextLine = parser.peek(lookAheadOffset);
@@ -186,12 +205,33 @@ final class DescriptionListSyntax extends md.BlockSyntax {
         }
 
         final nextContent = nextLine.content;
-        if (isValidTerm(nextContent)) {
-          // If the next line is a term, then keep looking.
+        final isEmpty = nextContent.trim().isEmpty;
+
+        if (isEmpty) {
+          // Only a single empty line is allowed before the first description.
+          if (foundEmptyAfterTerm) {
+            return false;
+          }
+
+          foundEmptyAfterTerm = true;
           continue;
         }
 
-        // Found a non-term line, check if it's a description.
+        if (isValidTerm(nextContent)) {
+          // If we already found an empty line, we can't have more terms.
+          if (foundEmptyAfterTerm) {
+            return false;
+          }
+
+          termsFound += 1;
+          if (termsFound >= maxTermsPerDescription) {
+            // Already found the maximum number of consecutive terms.
+            return false;
+          }
+          continue;
+        }
+
+        // Found a non-term, non-empty line, verify starts a description.
         return _descriptionPattern.hasMatch(nextContent);
       }
     }
@@ -205,13 +245,16 @@ final class DescriptionListSyntax extends md.BlockSyntax {
   /// doesn't start with a colon (`:`) or indentation.
   @visibleForTesting
   static bool isValidTerm(String content) {
-    final withoutLeadingSpaceContent = content.trimLeft();
-    if (withoutLeadingSpaceContent.isEmpty ||
-        withoutLeadingSpaceContent.length != content.length) {
+    final trimmedContent = content.trimLeft();
+    if (trimmedContent.isEmpty) {
       return false;
     }
 
-    return !content.startsWith(':') || !_descriptionPattern.hasMatch(content);
+    final firstChar = trimmedContent.codeUnitAt(0);
+    const colon = 0x3a;
+    const hash = 0x23;
+
+    return firstChar != colon && firstChar != hash;
   }
 
   /// Advances the [parser] past any consecutive empty lines.
