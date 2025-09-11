@@ -1,4 +1,4 @@
-## 0.1.1-wip
+## 0.1.1
 
 - Support a single empty line after terms and before the description.
 

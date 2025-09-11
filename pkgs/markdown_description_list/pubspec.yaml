@@ -1,7 +1,7 @@
 name: markdown_description_list
 description: >-
   Markdown extension with support for description/definition lists.
-version: 0.1.1-wip
+version: 0.1.1
 repository: https://github.com/dart-community/markdown_extensions/tree/main/pkgs/markdown_description_list
 
 resolution: workspace
