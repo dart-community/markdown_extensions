@@ -8,4 +8,4 @@ workspace:
   - pkgs/markdown_description_list
 
 dev_dependencies:
-  melos: ^7.1.0
+  melos: ^8.1.0
