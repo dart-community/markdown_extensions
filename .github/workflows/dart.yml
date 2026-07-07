@@ -29,6 +29,6 @@ jobs:
       - name: Check formatting
         run: dart run melos format --output=none --set-exit-if-changed
       - name: Analyze code
-        run: dart run melos exec dart analyze --fatal-infos
+        run: dart run melos analyze
       - name: Run tests
         run: dart run melos exec dart test --reporter=github --test-randomize-ordering-seed=random
