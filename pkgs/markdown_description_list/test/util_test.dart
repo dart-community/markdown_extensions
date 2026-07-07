@@ -3,20 +3,6 @@ import 'package:test/test.dart';
 
 void main() {
   group('Utilities', () {
-    group('indentation removal', () {
-      test('removes correct indentation', () {
-        expect(removeIndentation('  Line'), equals('Line'));
-        expect(removeIndentation('\tLine'), equals('Line'));
-        expect(removeIndentation('    Line'), equals('  Line'));
-        expect(removeIndentation('Line'), equals('Line'));
-        expect(
-          removeIndentation(' Line'),
-          equals(' Line'),
-        );
-        expect(removeIndentation(''), equals(''));
-      });
-    });
-
     group('withoutTrailingEmptyStrings', () {
       test('removes trailing empty strings', () {
         final list = ['a', 'b', '', ''];

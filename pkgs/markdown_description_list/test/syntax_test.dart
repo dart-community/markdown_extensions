@@ -283,6 +283,25 @@ Term
 </dl>'''),
         );
       });
+
+      test('does not continue descriptions with one-space indentation', () {
+        const markdown = '''
+Term
+: Description.
+ One-space indented paragraph.''';
+
+        expect(
+          renderMarkdown(markdown),
+          equals('''
+<dl>
+<dt>Term</dt>
+<dd>
+<p>Description.</p>
+</dd>
+</dl>
+<p>One-space indented paragraph.</p>'''),
+        );
+      });
     });
 
     group('inline formatting', () {
@@ -700,6 +719,26 @@ Term with $special & characters
         expect(html, contains(r'Term with $special &amp; characters'));
         expect(html, contains('Description with <html>'));
         expect(html, contains('&quot;quotes&quot;'));
+      });
+
+      test('keeps block marker text in terms as inline content', () {
+        const markdown = '''
+- Dash-prefixed term
+: Dash description.
+
+1. Ordered-looking term
+: Ordered description.
+
+---
+: Rule-looking description.''';
+
+        final html = renderMarkdown(markdown);
+        expect(html, contains('<dt>- Dash-prefixed term</dt>'));
+        expect(html, contains('<dt>1. Ordered-looking term</dt>'));
+        expect(html, contains('<dt>---</dt>'));
+        expect(html, isNot(contains('<ul>')));
+        expect(html, isNot(contains('<ol>')));
+        expect(html, isNot(contains('<hr')));
       });
 
       test('handles very long terms and descriptions', () {
