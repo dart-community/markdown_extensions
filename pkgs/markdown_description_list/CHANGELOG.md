@@ -1,4 +1,4 @@
-## 0.2.0-wip
+## 0.2.0
 
 - Treat description continuation lines as requiring either
   two spaces or one tab of indentation, matching the documented syntax.
