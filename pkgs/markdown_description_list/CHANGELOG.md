@@ -1,3 +1,8 @@
+## 0.1.2-wip
+
+- Require Dart 3.10 or later.
+- Increase dependency constraint of `package:markdown` to `^7.3.1`.
+
 ## 0.1.1
 
 - Support a single empty line after terms and before the description.
