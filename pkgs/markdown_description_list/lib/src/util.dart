@@ -1,38 +1,29 @@
 import 'package:meta/meta.dart';
 
-/// Returns the specified [line] with the expected indentation from
-/// a description continuation line removed.
-///
-/// Strips two spaces or one tab from the beginning of [line].
-@internal
-String removeIndentation(String line) {
-  if (line.startsWith('  ')) {
-    return line.substring(2);
-  } else if (line.startsWith('\t')) {
-    return line.substring(1);
-  }
-  return line;
-}
-
-/// Provides the [withoutTrailingEmptyStrings] extension to
+/// Provides the [withoutTrailingEmptyStrings] extension method to
 /// remove trailing empty strings from a list of strings.
 @internal
 extension WithoutTrailingEmptyStrings on List<String> {
-  /// Returns a new list with any trailing empty strings
-  /// removed from the end of this list.
+  /// Returns a list of these strings without any trailing empty strings.
+  ///
+  /// If this list has no trailing empty strings, the original list is returned.
   @internal
   List<String> get withoutTrailingEmptyStrings {
-    // Find the index of the last element that is not an empty string.
-    final lastNonEmptyIndex = lastIndexWhere((s) => s.isNotEmpty);
+    // Walk backwards to find the last string that should be preserved.
+    for (var index = length - 1; index >= 0; index -= 1) {
+      if (this[index].isNotEmpty) {
+        // No trailing empty strings were found, so avoid copying the list.
+        if (index == length - 1) {
+          return this;
+        }
 
-    // If no non-empty string is found, lastIndexWhere returns -1.
-    // In that case, we should return an empty list.
-    if (lastNonEmptyIndex == -1) {
-      return const [];
+        // Otherwise, return a new list containing elements from
+        // the start up to and including the last non-empty string.
+        return sublist(0, index + 1);
+      }
     }
 
-    // Otherwise, create a new list containing elements from the start
-    // up to and including the last non-empty string.
-    return sublist(0, lastNonEmptyIndex + 1);
+    // Every string was empty, or the list itself was empty.
+    return const [];
   }
 }

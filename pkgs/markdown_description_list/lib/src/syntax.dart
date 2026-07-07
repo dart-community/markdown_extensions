@@ -33,8 +33,9 @@ import 'util.dart';
 /// </dl>
 /// ```
 final class DescriptionListSyntax extends md.BlockSyntax {
-  /// Pattern that matches a description line starting with a colon and a space.
-  static final _descriptionPattern = RegExp(r'^\s*:\s+(.*)$');
+  /// Pattern that matches a description line with
+  /// optional leading whitespace, a colon, then whitespace.
+  static final RegExp _descriptionPattern = RegExp(r'^\s*:\s+(.*)$');
 
   /// The maximum number of consecutive terms to
   /// associate with a single description.
@@ -65,13 +66,13 @@ final class DescriptionListSyntax extends md.BlockSyntax {
     while (!parser.isDone && _isDescriptionListStart(parser)) {
       final groupElements = _parseTermsAndDescriptions(parser);
       elements.addAll(groupElements);
-      _skipEmptyLines(parser);
+      parser._skipBlankLines();
     }
 
     return elements.isNotEmpty ? md.Element('dl', elements) : null;
   }
 
-  /// Parses a consecutive terms and their descriptions.
+  /// Parses consecutive terms and their descriptions.
   ///
   /// Returns a list of `<dt>` and `<dd>` elements that
   /// correspond to the terms and their descriptions respectively.
@@ -88,41 +89,32 @@ final class DescriptionListSyntax extends md.BlockSyntax {
     final termElements = <md.Element>[];
 
     while (!parser.isDone) {
-      final currentContent = parser.current.content;
+      final currentLine = parser.current;
 
-      // Skip any empty lines while we look for the next term.
-      if (currentContent.trim().isEmpty) {
+      // Skip any blank lines while we look for the next term.
+      if (currentLine.isBlankLine) {
         parser.advance();
         continue;
       }
 
-      // If this is a non-empty string that's not a valid term,
-      // stop looking for more terms.
+      final currentContent = currentLine.content;
+
+      // If this line is not blank and it's content isn't a valid term,
+      // stop looking for additional terms.
       if (!isValidTerm(currentContent)) {
         break;
       }
 
-      final termLine = parser.current;
-      parser.advance();
-
-      // Parse the term line with document context for link references.
-      final termNodes = md.BlockParser(
-        [termLine],
-        parser.document,
-      ).parseLines();
-
-      final firstNode = termNodes.firstOrNull;
-      if (firstNode == null) continue;
-
       termElements.add(
         md.Element('dt', [
-          // If the content is wrapped in a paragraph, unwrap it.
-          if (firstNode is md.Element && firstNode.tag == 'p')
-            ...?firstNode.children
-          else
-            firstNode,
+          // Keep terms as inline content.
+          // Re-parsing a single term line as a block can turn
+          // block-like text such as "- Term" or "---"
+          // into a list or horizontal rule inside the `<dt>`.
+          md.UnparsedContent(currentContent.trimRight()),
         ]),
       );
+      parser.advance();
     }
 
     return termElements;
@@ -141,21 +133,23 @@ final class DescriptionListSyntax extends md.BlockSyntax {
 
       // Collect lines that continue this description.
       while (!parser.isDone) {
-        final line = parser.current.content;
-        final trimmedLine = line.trimLeft();
-        final isIndented = trimmedLine.length != line.length;
-        final isEmpty = trimmedLine.isEmpty;
+        final currentLine = parser.current;
+        final lineContent = currentLine.content;
 
-        if (isEmpty) {
-          // If this line is empty, add it and continue on to the next line.
+        if (currentLine.isBlankLine) {
+          // If this line is blank, add it and continue on to the next line.
           // If the description doesn't continue on, we'll remove it later.
           lines.add('');
-        } else if (isIndented) {
-          // If this line is indented, add it to the description's lines with
-          // the related indentation removed.
-          lines.add(removeIndentation(line));
+        } else if (lineContent.startsWith('  ')) {
+          // Two leading spaces continue a description.
+          // Remove those spaces before parsing the description content.
+          lines.add(lineContent.substring(2));
+        } else if (lineContent.startsWith('\t')) {
+          // A leading tab also continues a description.
+          // Remove the tab before parsing the description content.
+          lines.add(lineContent.substring(1));
         } else {
-          // If this line is not indented or empty, don't include it.
+          // If this line is not a continuation or blank, don't include it.
           break;
         }
 
@@ -183,57 +177,62 @@ final class DescriptionListSyntax extends md.BlockSyntax {
   bool _isDescriptionListStart(md.BlockParser parser) {
     if (parser.isDone) return false;
 
-    // Check if current line starts a sequence of one or more terms that are
-    // eventually followed by at least on description.
-    if (isValidTerm(parser.current.content)) {
-      // Look ahead to find the first non-term line,
-      // up to the limit of consecutive terms allowed.
-      var termsFound = 0;
-      var foundEmptyAfterTerm = false;
+    // If the current line isn't a valid term,
+    // it doesn't start a description list.
+    if (!isValidTerm(parser.current.content)) {
+      return false;
+    }
 
-      for (
-        var lookAheadOffset = 1;
-        // Look up to two additional lines to account for one new line
-        // as well as the first description itself.
-        lookAheadOffset <= maxTermsPerDescription + 2;
-        lookAheadOffset += 1
-      ) {
-        final nextLine = parser.peek(lookAheadOffset);
-        if (nextLine == null) {
-          // End of file reached before finding a description.
+    // Look ahead to find the description line.
+    // The furthest it can appear is
+    // after the maximum term count and one optional blank line.
+    final maxLookAheadOffset = maxTermsPerDescription + 1;
+    var termsFound = 1;
+    var foundBlankLineAfterTerm = false;
+
+    for (
+      var lookAheadOffset = 1;
+      lookAheadOffset <= maxLookAheadOffset;
+      lookAheadOffset += 1
+    ) {
+      final nextLine = parser.peek(lookAheadOffset);
+      if (nextLine == null) {
+        // End of file reached before finding a description.
+        return false;
+      }
+
+      if (nextLine.isBlankLine) {
+        // Only a single blank line is allowed before the first description.
+        if (foundBlankLineAfterTerm) {
           return false;
         }
 
-        final nextContent = nextLine.content;
-        final isEmpty = nextContent.trim().isEmpty;
-
-        if (isEmpty) {
-          // Only a single empty line is allowed before the first description.
-          if (foundEmptyAfterTerm) {
-            return false;
-          }
-
-          foundEmptyAfterTerm = true;
-          continue;
-        }
-
-        if (isValidTerm(nextContent)) {
-          // If we already found an empty line, we can't have more terms.
-          if (foundEmptyAfterTerm) {
-            return false;
-          }
-
-          termsFound += 1;
-          if (termsFound >= maxTermsPerDescription) {
-            // Already found the maximum number of consecutive terms.
-            return false;
-          }
-          continue;
-        }
-
-        // Found a non-term, non-empty line, verify starts a description.
-        return _descriptionPattern.hasMatch(nextContent);
+        foundBlankLineAfterTerm = true;
+        continue;
       }
+
+      final nextContent = nextLine.content;
+
+      // Found the first description, so this is a description list start.
+      if (_descriptionPattern.hasMatch(nextContent)) {
+        return true;
+      }
+
+      if (isValidTerm(nextContent)) {
+        // If we already found a blank line, we can't have more terms.
+        if (foundBlankLineAfterTerm) {
+          return false;
+        }
+
+        termsFound += 1;
+        if (termsFound > maxTermsPerDescription) {
+          // Already found the maximum number of consecutive terms.
+          return false;
+        }
+        continue;
+      }
+
+      return false;
     }
 
     return false;
@@ -242,7 +241,8 @@ final class DescriptionListSyntax extends md.BlockSyntax {
   /// Checks if the specified [content] is a valid term for a description list.
   ///
   /// Returns `true` if [content] contains non-whitespace content and
-  /// doesn't start with a colon (`:`) or indentation.
+  /// doesn't start with a colon (`:`) or hash (`#`),
+  /// after optional leading whitespace.
   @visibleForTesting
   static bool isValidTerm(String content) {
     final trimmedContent = content.trimLeft();
@@ -256,14 +256,17 @@ final class DescriptionListSyntax extends md.BlockSyntax {
 
     return firstChar != colon && firstChar != hash;
   }
+}
 
-  /// Advances the [parser] past any consecutive empty lines.
+/// Parsing extension methods for [md.BlockParser].
+extension _BlockParserExtensions on md.BlockParser {
+  /// Advances this parser past any consecutive blank lines.
   ///
   /// Used to skip whitespace between description list entries while
   /// maintaining proper parsing position.
-  static void _skipEmptyLines(md.BlockParser parser) {
-    while (!parser.isDone && parser.current.content.trim().isEmpty) {
-      parser.advance();
+  void _skipBlankLines() {
+    while (!isDone && current.isBlankLine) {
+      advance();
     }
   }
 }

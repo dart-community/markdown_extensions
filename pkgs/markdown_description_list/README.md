@@ -1,5 +1,5 @@
-Dart package that extends [`package:markdown`][] with support for
-description lists, sometimes known as definition lists.
+Dart package that extends [`package:markdown`][] with
+support for description lists, sometimes known as definition lists.
 
 [`package:markdown`]: https://pub.dev/packages/markdown
 
@@ -14,7 +14,7 @@ dart pub add markdown markdown_description_list
 
 ## Usage
 
-The package contains one library:
+The package provides a single library:
 
 - `package:markdown_description_list/markdown_description_list.dart`
 
@@ -25,7 +25,7 @@ The package contains one library:
 ### Parse description lists from Markdown
 
 To add support for parsing description lists in Markdown,
-add a `DescriptionListSyntax` in list of block syntaxes
+including `DescriptionListSyntax` in the list of block syntaxes
 provided to `package:markdown`.
 
 When creating a `Document`:
@@ -80,17 +80,25 @@ Markdown
 
 The supported syntax for description lists allows
 grouping one or more descriptions to one or more terms.
+By default, up to five consecutive terms can share a description.
+To adjust that limit, set `maxTermsPerDescription` when
+creating `DescriptionListSyntax`.
+
 To write description lists in this syntax, follow this procedure:
 
 1.  Write one or more terms on consecutive lines.
 2.  On a new line after the terms, add a colon and a space (`: `).
+    A single blank line can separate the terms from their first description.
 3.  After the colon and space, write a description.
 4.  To continue the description on to the next line,
-    indent the line's contents by two spaces.
+    indent the line's contents by two spaces or one tab.
 5.  To add an additional description for the preceding terms,
     repeat steps 2 to 4.
 6.  To add additional term and description groupings,
     repeat steps 1 to 5.
+
+Continuation lines indented by only one space aren't part of the description.
+Instead, they are parsed as regular Markdown after the description list.
 
 As an example, the following glossary written in Markdown is
 structured with a description list:
